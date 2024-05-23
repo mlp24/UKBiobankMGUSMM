@@ -1,0 +1,816 @@
+     Show Dotfiles Show Owner/Mode
+/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/
+
+
+####################################### 1. PREPROCESSING UKBIOBANK - Pipeline of work #####################################################################################################################
+
+#1. Whole UKBB data and preprocess it (ukb46518.r script to adapt levels)
+#2. Change field names (d4ukb46518_Fields.tsv, instance1Fields_ukb44382.txt) which can be found here (/rds/projects/g/gkoutosg-variant-prediction/ukbiobank/data_files_ukb)
+#3. Filter by disease (both AML and MDS) (ICD10 codes) - around 1230 patients
+#4. Save dataset (more or less 1230 x 2775 (or how many features there are))
+
+
+############################################################################################################################################################
+############################################################################################################################################################
+setwd("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work")
+library(tidyverse)
+library(data.table)
+library(tidylog)
+
+mainDir <- "/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work"
+NameRun <- 'Slurm'
+subDir <- paste0(sub('\\..*', '', NameRun), format(Sys.time(), '_%Y%m%d_%H%M'))
+dir.create(file.path(mainDir, subDir))
+IncludeFigHere <- file.path(mainDir, subDir)
+
+
+####################################### #1. Whole UKBB data and preprocess it (ukb46518.r script to adapt levels) ###############################################################################
+
+
+# R program ukb46518.tab created 2021-04-16 by ukb2r.cpp Mar 14 2018 14:22:05
+
+# Read function edited by ukbtools 2021-05-21 10:07:04
+#bd <- read.table("/rds/projects/g/gkoutosg-variant-prediction/ukbiobank/data_files_ukb/ukb46518.tab", header=TRUE, sep="\t")
+
+bd <- fread("/rds/projects/g/gkoutosg-variant-prediction/ukbiobank/data_files_ukb/ukb46518.tab")
+bd <- bd %>% rename(eid = f.eid)
+
+#bd$f.40005.0.0 <- as.Date(bd$f.40005.0.0)
+#bd$f.40005.1.0 <- as.Date(bd$f.40005.1.0)
+#bd$f.40005.2.0 <- as.Date(bd$f.40005.2.0)
+#bd$f.40005.3.0 <- as.Date(bd$f.40005.3.0)
+#bd$f.40005.4.0 <- as.Date(bd$f.40005.4.0)
+#bd$f.40005.5.0 <- as.Date(bd$f.40005.5.0)
+#bd$f.40005.6.0 <- as.Date(bd$f.40005.6.0)
+#bd$f.40005.7.0 <- as.Date(bd$f.40005.7.0)
+#bd$f.40005.8.0 <- as.Date(bd$f.40005.8.0)
+#bd$f.40005.9.0 <- as.Date(bd$f.40005.9.0)
+#bd$f.40005.10.0 <- as.Date(bd$f.40005.10.0)
+#bd$f.40005.11.0 <- as.Date(bd$f.40005.11.0)
+#bd$f.40005.12.0 <- as.Date(bd$f.40005.12.0)
+#bd$f.40005.13.0 <- as.Date(bd$f.40005.13.0)
+#bd$f.40005.14.0 <- as.Date(bd$f.40005.14.0)
+#bd$f.40005.15.0 <- as.Date(bd$f.40005.15.0)
+#bd$f.40005.16.0 <- as.Date(bd$f.40005.16.0)
+#lvl.1001 <- c(-3,-1,1,2,3,4,5,6,1001,1002,1003,2001,2002,2003,2004,3001,3002,3003,3004,4001,4002,4003)
+#lbl.1001 <- c("Prefer not to answer","Do not know","White","Mixed","Asian or Asian British","Black or Black British","Chinese","Other ethnic group","British","Irish","Any other white background","White and Black Caribbean","White and Black African","White and Asian","Any other mixed background","Indian","Pakistani","Bangladeshi","Any other Asian background","Caribbean","African","Any other Black background")
+#bd$f.21000.0.0 <- ordered(bd$f.21000.0.0, levels=lvl.1001, labels=lbl.1001)
+#bd$f.21000.1.0 <- ordered(bd$f.21000.1.0, levels=lvl.1001, labels=lbl.1001)
+#bd$f.21000.2.0 <- ordered(bd$f.21000.2.0, levels=lvl.1001, labels=lbl.1001)
+#bd$f.53.0.0 <- as.Date(bd$f.53.0.0)
+#bd$f.53.1.0 <- as.Date(bd$f.53.1.0)
+#bd$f.53.2.0 <- as.Date(bd$f.53.2.0)
+#bd$f.53.3.0 <- as.Date(bd$f.53.3.0)
+
+####################################### #2. Change field names which can be found here (/rds/projects/g/gkoutosg-variant-prediction/ukbiobank/data_files_ukb) ############ ###############################################################################
+Names <- fread("/rds/projects/g/gkoutosg-variant-prediction/ukbiobank/data_files_ukb/ukb46518_Fields.tsv")
+#Names <- fread("/rds/projects/g/gkoutosg-variant-prediction/ukbiobank/data_files_ukb/ukb46518_Fields.tsv")
+colnames(bd) <- c(Names$col.name)
+both <- bd
+
+######################################## #3. Filter by disease (both AML and MDS) (ICD10 codes) - around 1230 patients #####################################################################################################################
+
+
+#you need to pick a date here too!! Key information diagnosis and when it was done!!
+#column - age_at_cancer_diagnosis_f40008_3_0
+
+columns_of_interest <- c('eid','f31_0_0', 'f34_0_0', 'f53_0_0', 'f21000', 'f30590', 'f42492', 'f40005', 'f40008',
+                         'f40006', 'f30220', 'f30150', 'f30210',
+                         'f30030', 'f30290', 'f30029', 'f30280', 'f30180', 'f30120', 'f30050', 'f30060',
+                         'f30040', 'f30010', 'f30260', 'f30270', 'f30130', 'f30190', 'f30140', 'f30200',
+                         'f30140', 'f30200', 'f30170', 'f30230', 'f30080', 'f30090', 'f30110', 'f30010',
+                         'f30070', 'f30250', 'f30240', 'f30000', 'f30620', 'f30600', 'f30610', 'f30630',
+                         'f30640', 'f30650', 'f30710', 'f30680', 'f30690', 'f30700', 'f30720', 'f30660',
+                         'f30730', 'f30740', 'f30750', 'f30760', 'f30770', 'f30780', 'f30790', 'f30800',
+                         'f30860', 'f30810', 'f30820', 'f30830', 'f30840', 'f30850', 'f30870', 'f30880', 'f30670')
+
+interested <- bd %>%
+  select("eid", contains(columns_of_interest)) %>%
+  mutate(across(everything(), as.character))
+
+CancerColumns <- interested %>%
+  select("eid", contains("type_of_cancer_icd10"), contains("age_at_cancer_diagnosis"), contains("date_of_cancer_diagnosis"), contains("date_of_birth_f33")) %>%
+  mutate(across(everything(), as.character))
+
+#rows_with_C900 <- apply(CancerColumns, 1, function(x) any(grepl("C900", x)))
+
+rows_with_all <- apply(CancerColumns, 1, function(x) {
+  any(grepl("C900", x)) || any(grepl("C920", x)) || any(grepl("D472", x)) || any(grepl("D469", x))
+})
+
+df_filtered <- CancerColumns[rows_with_all, ]
+print(length(unique(df_filtered$eid)))
+#1155 participants
+
+df_long <- df_filtered %>%
+  pivot_longer(
+    cols = -eid,
+    names_to = c(".value", "instance", "another"),
+    names_pattern = "(.*)_(.*)_(.*)"
+  ) %>%
+  select(-another) %>%
+  drop_na()
+
+
+df1 <- apply(df_long, 1, function(x) {
+  any(grepl("C900", x)) || any(grepl("C920", x)) || any(grepl("D472", x)) || any(grepl("D469", x))
+})
+
+JustCancers <- df_long[df1, ]
+print(length(unique(JustCancers$eid)))
+#1155
+
+fwrite(df_long, file = paste0( IncludeFigHere, "/InfoWithAllCancers.csv")) #this will be good to look at multimorbidity for example
+fwrite(JustCancers, file = paste0(IncludeFigHere, "/InfoWithOurCancers.csv"))
+
+##############################
+##############################
+##############################
+
+DiseasePatientIds <- unique(df_long$eid)
+
+bd_Disease <- bd %>%
+  filter(eid %in% DiseasePatientIds)
+
+fwrite(bd_Disease, file = paste0(IncludeFigHere, "/Disease_bd.csv"))
+
+bd_Disease_Interested <- bd_Disease %>%
+  select(eid, contains(columns_of_interest)) #%>%
+#mutate(across(everything(), as.character))
+
+fwrite(bd_Disease, file = paste0(IncludeFigHere, "/Disease_bd_interested.csv"))
+
+############################################################################################################################################################
+############################################################################################################################################################
+#Start!!!!
+
+IncludeFigHere <- "/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Feb27_20240227_1537"
+bd_Disease_Interested <- fread(paste0(IncludeFigHere, "/Disease_bd_interested.csv"))
+JustCancers <- fread(paste0(IncludeFigHere, "/InfoWithOurCancers.csv"))
+
+Assessment <- bd_Disease_Interested %>%
+  dplyr::select(eid, date_of_attending_assessment_centre_f53_0_0)
+
+library(lubridate)
+JustCancers$eid <- as.numeric(JustCancers$eid)
+JustCancers_assess <- JustCancers %>%
+  left_join(., Assessment) %>%
+  mutate(TimeChange = ymd(date_of_cancer_diagnosis_f40005) - ymd(date_of_attending_assessment_centre_f53_0_0)) %>%
+  mutate(Type_cancer = case_when(type_of_cancer_icd10_f40006 == "C920" ~ "Acute myeloblastic leukemia",
+                                 type_of_cancer_icd10_f40006 == "C900" ~ "Multiple myeloma",
+                                 type_of_cancer_icd10_f40006 == "D469" ~ "Myelodysplastic syndrome",
+                                 type_of_cancer_icd10_f40006 == "D472" ~ "Monoclonal gammopathy (MGUS)")) %>%
+  mutate(TimeChange = as.numeric(TimeChange/30/12)) %>%
+  mutate(Categories =  cut(TimeChange, breaks =  c(-30, -15, -10, -5,-3, 0, 3, 5, 10, Inf),  include.lowest=TRUE))
+
+table(JustCancers_assess$Type_cancer)
+length(unique(JustCancers_assess$eid))
+
+#Histogram of TimeChange or some sort of visualization
+
+MGUS_MM <- JustCancers_assess %>%
+  filter(type_of_cancer_icd10_f40006 %in% c("C900", "D472")) %>%
+  group_by(eid) %>%
+  mutate(
+    num_diagnoses = n(), # Count of diagnoses for each patient
+    all_same = n_distinct(type_of_cancer_icd10_f40006)) %>%
+  mutate(JustMyeloma = ifelse(num_diagnoses > 1 & all(type_of_cancer_icd10_f40006 == "C900"), 1, 0) )  %>%
+  mutate(JustMGUS = ifelse(num_diagnoses > 1 & all_same == 1 & all(type_of_cancer_icd10_f40006 == "D472"), 1, 0) ) %>%
+  mutate(BothMMandMGUS = ifelse(num_diagnoses > 1 & all_same == 2, 1, 0)) %>%
+  mutate(FinalLabel = ifelse(num_diagnoses ==1, Type_cancer, ifelse(all_same == 1, ifelse(JustMyeloma == 1, "Multiple myeloma", "Monoclonal gammopathy (MGUS)"), "Both") )) %>%
+  arrange(eid, age_at_cancer_diagnosis_f40008) %>%
+  mutate(rank = dense_rank(Type_cancer)) %>%
+  ungroup()
+
+
+table(MGUS_MM$Type_cancer)
+length(unique(MGUS_MM$eid))
+table(MGUS_MM$FinalLabel)
+
+#Both Monoclonal gammopathy (MGUS)             Multiple myeloma
+#30                          123                          665
+
+
+NumDiagnosis <- MGUS_MM %>%
+  select(eid, num_diagnoses:FinalLabel) %>%
+  unique()
+
+table(NumDiagnosis$num_diagnoses, NumDiagnosis$FinalLabel)
+
+#Final table
+#Both Monoclonal gammopathy (MGUS) Multiple myeloma
+#1    0                          120              606
+#2   15                            0               28
+#3    0                            1                1
+
+
+
+############ Description of dataset for unique IDs (Table One)
+################################################################################################ 
+
+#UniqueIDs <- MGUS_MM %>% 
+#  select(eid, FinalLabel) %>% 
+#  unique()
+
+
+columns_of_interest <- c('eid','f53_0_0', 'f21003_0_0', 'f31_0_0', 'f34_0_0', 'f21000', 'f30590', 'f42492', 'f30220', 'f30150', 'f30210',
+                         'f30030', 'f30290', 'f30029', 'f30280', 'f30180', 'f30120', 'f30050', 'f30060',
+                         'f30040', 'f30010', 'f30260', 'f30270', 'f30130', 'f30190', 'f30140', 'f30200',
+                         'f30140', 'f30200', 'f30170', 'f30230', 'f30080', 'f30090', 'f30110', 'f30010',
+                         'f30070', 'f30250', 'f30240', 'f30000', 'f30620', 'f30600', 'f30610', 'f30630',
+                         'f30640', 'f30650', 'f30710', 'f30680', 'f30690', 'f30700', 'f30720', 'f30660',
+                         'f30730', 'f30740', 'f30750', 'f30760', 'f30770', 'f30780', 'f30790', 'f30800',
+                         'f30860', 'f30810', 'f30820', 'f30830', 'f30840', 'f30850', 'f30870', 'f30880', 'f30670')
+
+Interested <- bd_Disease_Interested %>% 
+  select(contains(columns_of_interest)) #all instances
+
+Interested_0 <- Interested %>% 
+  select(eid, contains("_0_0")) #only first instance ( for future - maybe inetresting thing is to match repeeated instances with time closer to diagnosis)
+
+#FinalDataset <- Interested_0 %>%
+#  left_join(UniqueIDs, .)
+#
+##understand continous and categorical nad change what sex and ethnicity mean, plus change the column names!
+#
+#lvl.1001 <- c(-3,-1,1,2,3,4,5,6,1001,1002,1003,2001,2002,2003,2004,3001,3002,3003,3004,4001,4002,4003)
+#lbl.1001 <- c("Prefer not to answer","Do not know","White","Mixed","Asian or Asian British","Black or Black British","Chinese","Other ethnic group","British","Irish","Any other white background","White and Black Caribbean","White and Black African","White and Asian","Any other mixed background","Indian","Pakistani","Bangladeshi","Any other Asian background","Caribbean","African","Any other Black background")
+#FinalDataset$ethnic_background_f21000_0_0 <- as.character(ordered(FinalDataset$ethnic_background_f21000_0_0, levels=lvl.1001, labels=lbl.1001))
+#
+#FinalDatasetCat <- FinalDataset %>% 
+#  mutate(sex_f31_0_0 = ifelse(sex_f31_0_0 == 1, "Male", "Female")) %>%
+#  mutate_at(vars(sex_f31_0_0,ethnic_background_f21000_0_0 ), as.character)
+#
+#names(FinalDatasetCat)  <- sub("_f.*", "", names(FinalDatasetCat) )
+#
+#myVars <- setdiff(colnames(FinalDatasetCat), c("eid", "date_of_attending_assessment_centre", "year_of_birth", "FinalLabel"))
+#tab3 <- CreateTableOne(vars = myVars, strata = 'FinalLabel', data = FinalDatasetCat)
+#test <- print(tab3, exact = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, formatOptions = list(big.mark = ","))
+#write.csv(test, file = paste0(IncludeFigHere, "/FinalTable.csv"))
+
+arrows <-
+  tibble(
+    x1 = c(-25),
+    x2 = c(-27),
+    y1 = c(4),
+    y2 = c(2)
+  )
+
+pdf(paste0(IncludeFigHere, "/Boxplots_Initial.pdf"), 9, 7)
+
+print( ggplot(MGUS_MM, aes(TimeChange)) +
+  geom_histogram(binwidth = 1,  colour="black" ,aes(fill= Type_cancer )) +
+  theme_bw() +
+  geom_vline(aes(xintercept= 0 ),
+             color="darkred", linetype = "dashed",  size=1) +
+  labs(subtitle = "Years from cancer diagnosis to blood taken",y = "Diagnosis", x = "Time to diagnosis (years)", caption = "-5 means cancer was diagnosed 5 years BEFORE blood taken,
+       +5, cancer was diagnosed 5 years AFTER blood taken (e.g recruited in UKBB).
+       Each of the bars equals 1 year (binwidth = 1)") +
+  annotate("text", x = -24, y = 6, label = "1 participant diagnosed in 1983") +
+  geom_curve(
+    data = arrows, aes(x = x1, y = y1, xend = x2, yend = y2),
+    arrow = arrow(length = unit(0.08, "inch")), size = 0.5,
+    color = "gray20", curvature = -0.3) +
+  annotate(
+    "rect",
+    xmin = 0, xmax = 10, ymin = 0, ymax = 100,
+    alpha = .05,
+    fill = "blue", colour = NA
+  ) +
+  annotate("text", x = 5, y = -2, label = "MM diagnosis after blood taken: 496", size = 3) #diffrence between MM diagnoisis and individuals with MM
+)
+
+dev.off()
+
+
+#Nice plot of both!
+
+DuplicatedIDs <- ggplot(MGUS_MM %>% filter(num_diagnoses >1 ), aes(TimeChange, as.character(eid), group = as.character(eid))) +
+  geom_point(aes(colour = Type_cancer), size = 2) +
+  geom_line(aes(colour = FinalLabel)) +
+    geom_vline(aes(xintercept= 0 ),
+               color="darkred", linetype = "dashed",  size=1) +
+  theme_bw() + 
+  labs(y = "IDs", title = "IDs with more than one diagnoisis (45)", caption = "-5 means cancer was diagnosed 5 years BEFORE blood taken,
+       +5, cancer was diagnosed 5 years AFTER blood taken (e.g recruited in UKBB).")
+
+pdf(paste0(IncludeFigHere, "/DuplicatedIDs.pdf"), 9, 7)
+print(DuplicatedIDs)
+dev.off()
+##################
+
+
+#Relapse <- MGUS_MM_Indiv %>% 
+#  filter(relapse == TRUE) 
+#
+#s <- MGUS_MM_Indiv %>% 
+#  filter(eid %in% Relapse$eid)
+#
+
+
+MGUS_MM_Indiv <- MGUS_MM %>%
+  group_by(eid) %>%
+  mutate(repeatedMeasurements = if_else(abs(lag(TimeChange) - TimeChange) <= 0.3, TRUE, FALSE, missing = FALSE)) %>%
+ # mutate(diagnosis_within_1_year = if_else(abs(lag(TimeChange) - TimeChange) <= 1, TRUE, FALSE, missing = FALSE)) %>%
+  mutate(firstdiag = if_else(age_at_cancer_diagnosis_f40008 == min(age_at_cancer_diagnosis_f40008), "First", "Other" )) %>%
+ # mutate(relapse = if_else(firstdiag == "Other" & FinalLabel == "Multiple myeloma"  & diagnosis_within_1_year == FALSE, TRUE, FALSE )) %>%
+  ungroup() %>%
+  mutate(ToEliminate = ifelse(repeatedMeasurements == TRUE | FinalLabel != "Both" & firstdiag == "Other", TRUE, FALSE)) %>%
+  filter(!ToEliminate)
+
+DuplicatedIDs <- ggplot(MGUS_MM_Indiv %>% filter(num_diagnoses >1 ), aes(TimeChange, as.character(eid), group = as.character(eid))) +
+  geom_point(aes(colour = Type_cancer), size = 2) +
+  geom_line(aes(colour = FinalLabel)) +
+  geom_vline(aes(xintercept= 0 ),
+             color="darkred", linetype = "dashed",  size=1) +
+  theme_bw() + 
+  labs(y = "IDs", title = "IDs with more than one diagnosis (13)", caption = "-5 means cancer was diagnosed 5 years BEFORE blood taken,
+       +5, cancer was diagnosed 5 years AFTER blood taken (e.g recruited in UKBB).")
+
+pdf(paste0(IncludeFigHere, "/DuplicatedIDs2.pdf"), 9, 7)
+print(DuplicatedIDs)
+dev.off()
+
+fwrite(MGUS_MM_Indiv,file = paste0( IncludeFigHere, "/MM_MGUSFilter1.csv")) 
+
+######################### Label
+
+#and proceed with chris definition of patients 
+
+#define final label - high risk groups and diagnosis row: 
+#Email: 5th March
+
+#So that we are all on the same page I have attached the Grant report I submitted last week. In it, we have proposed that for analytical purposes we will then assume that
+#
+#(i)       Ongoing MGUS (diagnosed before or after first UK Biobank assessment) represents a cohort enriched for stable MGUS at low risk of myeloma progression.
+#(ii)      Individuals obtaining a myeloma diagnosis within 3 years post first UK biobank assessment represent a cohort of MGUS at time of entry with high risk of myeloma progression.
+#(iii)     Individuals obtaining a myeloma diagnosis beyond 3 years post first UK biobank assessment represent a cohort of MGUS at time of entry with intermediate risk of myeloma progression.
+
+#blood taken with mgus and no change to mm - low risk myeloma progression 
+#blood taken with myeloma developed +3 years after (no mgus diagnoisis) - high risk
+#blood taken with mgus and change to myeloma within 3 years, blood taken with myeloma developed 3 years after (no mgus diagnoisis) - high risk
+#exclude people with myeloma diagnois alone and before blood taken
+#
+
+#for myeloma, keep only the first - the second means recurrence. But no myeloma issue with second diganoisis being after bloods 
+#for MGU, first if repeated (3 measurements) and for Both - good to have it flagged. If TimeChange for myeloma ( all going in this direction) decision: if negative (last myeloma record), 
+#if different - changing myeloma diagnosis too and if positive both - high porgression or low depending on when myeloma develops. 
+
+
+FinalLabels <- MGUS_MM_Indiv %>% #do not need the num diagnoisis only one with 2 is the both
+  group_by(eid) %>%
+  mutate(Crossing = case_when(FinalLabel == "Both" & sign(max(TimeChange))!=sign(min(TimeChange)) ~ "Yes",
+                             FinalLabel == "Both" & sign(max(TimeChange))==sign(min(TimeChange)) & sign(min(TimeChange)) == -1 ~ "Negative", 
+                             FinalLabel == "Both" & sign(max(TimeChange))==sign(min(TimeChange)) & sign(min(TimeChange)) == 1 ~ "Positive", 
+                             TRUE ~ "No crossing"))%>% 
+ # mutate(Crossing = ifelse(FinalLabel == "Both", ifelse(sign(max(TimeChange))!=sign(min(TimeChange)), "Yes", "No")) %>% 
+  mutate(Progression = case_when( TimeChange < 0 & FinalLabel == "Monoclonal gammopathy (MGUS)" ~ "low risk", 
+                            FinalLabel == "Multiple myeloma" & Categories == "(0,3]"  ~ "high risk",
+                            Crossing == "Yes" & Type_cancer == "Multiple myeloma"  ~ "high risk", 
+                            Crossing == "Yes" & Type_cancer != "Multiple myeloma"  ~ "delete", 
+                            Crossing == "Negative" & Type_cancer == "Multiple myeloma"  ~ "delete", 
+                            Crossing == "Positive" & Type_cancer == "Multiple myeloma"  ~ "intermediate risk", #count diagnosis with Mgus but know will develop to MM
+                            Crossing == "Positive" & Type_cancer != "Multiple myeloma"  ~ "delete",
+                            FinalLabel == "Multiple myeloma" & TimeChange > 3  ~ "intermediate risk", 
+                            FinalLabel == "Multiple myeloma" & TimeChange < 0 ~ "delete", 
+                            FinalLabel == "Monoclonal gammopathy (MGUS)" & TimeChange > 0 ~ "delete" ))
+
+table(FinalLabels$Progression)
+
+
+FinalDataset <- FinalLabels %>%
+  filter(Progression != "delete")
+
+length(unique(FinalDataset$eid))
+#537
+
+pdf(paste0(IncludeFigHere, "/Boxplots_NewLabel.pdf"), 9, 7)
+
+print(
+  
+  ggplot(FinalDataset, aes(TimeChange)) +
+  geom_histogram(binwidth = 1,  colour="black" ,aes(fill= FinalLabel )) +
+  theme_bw() +
+  geom_vline(aes(xintercept= 0 ),
+             color="darkred", linetype = "dashed",  size=1) +
+  labs(subtitle = "Years from cancer diagnosis to blood taken",y = "Participants", x = "Time to diagnosis (years)", caption = "-5 means cancer was diagnosed 5 years BEFORE blood taken,
+       +5, cancer was diagnosed 5 years AFTER blood taken (e.g recruited in UKBB).
+       Each of the bars equals 1 year (binwidth = 1)") 
+
+)
+
+dev.off()
+
+
+UniqueIDs2 <-  FinalDataset %>% 
+  select(eid, Progression, Type_cancer, FinalLabel, Crossing) %>% 
+  unique()
+
+Interested <- bd_Disease_Interested %>% 
+  select(contains(columns_of_interest)) #all instances
+
+Interested_0 <- Interested %>% 
+  select(eid, contains("_0_0")) #only first instance ( for future - maybe inetresting thing is to match repeeated instances with time closer to diagnosis)
+
+FinalDataset2 <- Interested_0 %>%
+  left_join(UniqueIDs2, .) %>%
+  ungroup()
+
+lvl.1001 <- c(-3,-1,1,2,3,4,5,6,1001,1002,1003,2001,2002,2003,2004,3001,3002,3003,3004,4001,4002,4003)
+lbl.1001 <- c("Prefer not to answer","Do not know","White","Mixed","Asian or Asian British","Black or Black British","Chinese","Other ethnic group","British","Irish","Any other white background","White and Black Caribbean","White and Black African","White and Asian","Any other mixed background","Indian","Pakistani","Bangladeshi","Any other Asian background","Caribbean","African","Any other Black background")
+FinalDataset2$ethnic_background_f21000_0_0 <- as.character(ordered(FinalDataset2$ethnic_background_f21000_0_0, levels=lvl.1001, labels=lbl.1001))
+
+FinalDatasetCat2 <- FinalDataset2 %>% 
+  mutate(sex_f31_0_0 = ifelse(sex_f31_0_0 == 1, "Male", "Female")) %>%
+  mutate_at(vars(sex_f31_0_0,ethnic_background_f21000_0_0 ), as.character)
+
+names(FinalDatasetCat2)  <- sub("_f.*", "", names(FinalDatasetCat2) )
+
+fwrite(FinalDatasetCat2,file = paste0( IncludeFigHere, "/FinalDataset_Label.csv")) 
+#FinalDatasetCat2 <- fread(paste0( IncludeFigHere, "/FinalDataset_Label.csv")) 
+
+
+
+library(tableone)
+myVars <- setdiff(colnames(FinalDatasetCat2), c("eid", "date_of_attending_assessment_centre", "year_of_birth", "Progression"))
+tab3 <- CreateTableOne(vars = myVars, strata = 'Progression', data = FinalDatasetCat2)
+test <- print(tab3, exact = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, formatOptions = list(big.mark = ","))
+write.csv(test, file = paste0(IncludeFigHere, "/FinalTable2.csv"))
+
+#Missingness
+
+table(is.na(FinalDatasetCat2))
+
+#FALSE  TRUE 
+#30042  3252 
+
+#(3252/(3252+ 30042))*100 = 9.76 %
+
+#Plotting 
+
+source("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Plotting.R")
+
+pdf(paste0( IncludeFigHere, "/FirstPlot.pdf"), onefile = TRUE, width = 25, height = 10)
+
+Numeric <-  FinalDatasetCat2 %>%
+  dplyr::select(Progression, "basophill_percentage": "urea") %>%
+  pivot_longer(-Progression, names_to = "Features", values_to = "Value") 
+
+Plot1 <- Numeric %>%
+  ggplot(aes(  Progression, Value,fill = Progression)) +
+  facet_wrap( Features ~. , scales = "free") +
+  #geom_violindot(scale = "area")+
+  geom_boxplot(outlier.shape = NA) +
+  #geom_miss_point(alpha = 0.5) 
+  geom_point(alpha = 0.5) +
+  labs( x = "Progression", y= "Value") + 
+  theme_bw()
+#scale_colour_manual(values = cols, aesthetics = c("fill"))+ 
+# guides(colour=FALSE)
+
+print(Plot1)
+
+
+dev.off()
+
+#Missing values 
+
+library(mice)
+
+pdf(paste0( IncludeFigHere, "/PlotMissing.pdf"), 13,15)
+
+PlotMissingMagda(FinalDatasetCat2)
+
+dev.off()
+
+library(finalfit)
+
+
+pdf(paste0( IncludeFigHere, "/PlotMissing2.pdf"), 13,15)
+
+print(FinalDatasetCat2 %>%
+  missing_plot()
+)
+
+dev.off()
+
+
+pdf(paste0( IncludeFigHere, "/PlotMissing3.pdf"), 13,15)
+
+print(Missing(Numeric))
+
+dev.off()
+
+library(naniar)
+
+pct_miss_case(FinalDatasetCat2)
+
+pdf(paste0( IncludeFigHere, "/PlotMissing4.pdf"), 13,15)
+print(gg_miss_var(FinalDatasetCat2, show_pct = TRUE))
+dev.off()
+
+pdf(paste0( IncludeFigHere, "/PlotMissing5.pdf"), 13,15)
+print(gg_miss_var(FinalDatasetCat2, show_pct = TRUE, facet = Progression))
+dev.off()
+
+pdf(paste0( IncludeFigHere, "/PlotMissing6.pdf"), 13,15)
+
+print(vis_miss(FinalDatasetCat2))
+
+dev.off()
+
+
+ll <- data.frame(is.na(FinalDatasetCat2)) # %>%
+cols <- sapply(ll, is.logical)
+ll[, cols] <- lapply(ll[, cols], as.numeric)
+
+Miss1 <- UpSetR::upset(ll,
+                       nsets = 20, number.angles = 10, point.size = 3.5, line.size = 2,
+                       mainbar.y.label = "Missing Values", sets.x.label = "Total Number Missing Values",
+                       text.scale = c(2.3, 2.3, 2, 2, 2, 1.75), order.by = "freq", sets.bar.color = "red3"
+)
+
+pdf(paste0( IncludeFigHere, "/SFig2_MissingVal.pdf"), 34, 23)
+print(Miss1)
+dev.off()
+
+
+missing_values_per_row <- as.numeric(round((rowSums(is.na(FinalDatasetCat2))/dim(FinalDatasetCat2)[2])*100,2))
+
+MissingIDs <- FinalDatasetCat2 %>% 
+  add_column(Missing = missing_values_per_row) %>%
+  arrange(-Missing) #12 people with 86% missing
+
+pdf(paste0( IncludeFigHere, "/Missing_Rows.pdf"), 4, 5)
+print(
+
+ggplot(MissingIDs, aes(Missing, fill = Progression)) + 
+  geom_histogram(stat = "bin", binwidth = 1) + theme_bw() + 
+  labs(x = "Missing (%)")
+
+)
+
+dev.off()
+  
+#have to delete those with 80% missing 
+
+#take out patients with most missing data 
+#take out variables with 30% or above missing
+
+#missing percentage per
+
+#library(MissMech)
+#explanatory = c("rheumatoid", "immature_reticulocyte")
+#dependent = "Progression" 
+#
+#FinalDatasetCat2 %>% 
+#  select(explanatory) %>% 
+#  MissMech::TestMCARNormality()
+
+
+#Delete 
+
+#include age at blood taken
+
+names(FinalDatasetCat2)
+
+FinalDatasetMissing <- FinalDatasetCat2 %>% 
+  filter(eid %in% filter(FinalDatasetCat2, MissingIDs$Missing < 80 )$eid) %>% #those ids with more than 80% data 
+  mutate(age_blood =  age_when_attended_assessment_centre) %>%
+  select(-c(rheumatoid, oestradiol, date_of_attending_assessment_centre, year_of_birth, ethnic_background, age_when_attended_assessment_centre)) #date not really needed right? 
+
+table(is.na(FinalDatasetMissing))
+
+#FALSE  TRUE 
+#30803  2146 
+
+#(2146/(30803+ 2146))*100 = 6.51 %
+
+
+pdf(paste0( IncludeFigHere, "/PlotMissingAfter.pdf"), 13,15)
+
+print(vis_miss(FinalDatasetMissing,  sort_miss = TRUE))
+
+dev.off()
+
+pdf(paste0( IncludeFigHere, "/PlotMissingAfterCluster.pdf"), 13,15)
+
+print(vis_miss(FinalDatasetMissing,  cluster = TRUE, sort_miss = TRUE) + theme(axis.text.x =  element_text(angle = 90)))
+
+dev.off()
+
+############################
+
+
+
+fwrite(FinalDatasetMissing, file = paste0(IncludeFigHere, "/FinalDatasetMissing.csv"))
+#FinalDatasetMissing <- fread( paste0(IncludeFigHere, "/FinalDatasetMissing.csv"))
+#############################
+
+
+########################. #Imputation
+########################. 
+########################. 
+########################. FinalDatasetMissing$Progression <- as.character(FinalDatasetMissing$Progression)
+########################. 
+########################. rec <- recipe(Progression ~ .,
+########################.               data = FinalDatasetMissing)
+########################. 
+########################. Predictors <- FinalDatasetMissing %>%
+########################.   select( basophill_percentage:urea)
+########################. 
+########################. DataImputed <-  rec %>%
+########################.   step_string2factor(all_nominal_predictors()) %>%
+########################.   step_impute_knn(names(Predictors), neighbors = 3)
+########################. 
+########################. ratio_recipe2 <- prep(DataImputed, training = FinalDatasetMissing)
+########################. 
+########################. imputed <- bake(ratio_recipe2, FinalDatasetMissing)
+########################. 
+########################. table(is.na(imputed))
+########################. 
+########################. fwrite(imputed, file = paste0(IncludeFigHere, "/imputed.csv"))
+########################. 
+
+##################################### Match controls
+
+#before or after imputation? Probably before? 
+#%>%
+#  mutate(age_blood =  age_at_cancer_diagnosis_f40008 - interval(date_of_attending_assessment_centre_f53_0_0, date_of_cancer_diagnosis_f40005) %>% as.numeric('years')) 
+
+
+
+Names <- fread("/rds/projects/g/gkoutosg-variant-prediction/ukbiobank/data_files_ukb/ukb46518_Fields.tsv")
+#Names <- fread("/rds/projects/g/gkoutosg-variant-prediction/ukbiobank/data_files_ukb/ukb46518_Fields.tsv")
+colnames(bd) <- c(Names$col.name)
+both <- bd
+IncludeFigHere <- "/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Feb27_20240227_1537"
+#imputed <- fread(paste0(IncludeFigHere, "/imputed.csv"))
+
+
+#Get only columns filtered out in our data (FinalDatasetMissing)
+
+Healthy <- bd %>%
+  select(eid, contains("date_of_"), contains("_first_reported_")) %>%
+  select(-contains("date_of_first_antenatal_assessment"), -contains("mother_age_on_date_of_delivery_"), -contains("date_of_attending_assessment_centre"), 
+         -contains("date_of_consenting_to_join_uk_biobank_f200_0_0"), -contains("date_of_completing_mental_health_questionnaire_f20400_0_0"))
+
+#select patients that are missing all of these things
+write.table(as.character(names(Healthy)), file ="Healthy.txt")
+
+Healthy2 <- Healthy %>%
+  filter(if_all(c(date_of_death_f40000_0_0:date_q99_first_reported_other_chromosome_abnormalities_not_elsewhere_classified_f132604_0_0), is.na)) 
+#our healthy patients!!! Megre now with our selected ones. 
+
+HealthyIDs <- Healthy2$eid
+
+
+Healthy <- bd %>%
+  select(contains(names(Interested_0))) %>%
+  filter(eid %in% HealthyIDs) %>% 
+  mutate(Progression = "Healthy") %>% 
+  mutate(Type_cancer = "Healthy") %>%
+  mutate(FinalLabel = "Healthy") %>%
+  mutate(Crossing = "Healthy")  %>%
+  mutate(age_blood =  age_when_attended_assessment_centre_f21003_0_0) %>%
+  select(-c(rheumatoid_factor_f30820_0_0, oestradiol_f30800_0_0, date_of_attending_assessment_centre_f53_0_0, year_of_birth_f34_0_0, ethnic_background_f21000_0_0, age_when_attended_assessment_centre_f21003_0_0)) %>% #date not really needed right? 
+  mutate(sex_f31_0_0 = ifelse(sex_f31_0_0 == 1, "Male", "Female")) 
+
+names(Healthy)  <- sub("_f.*", "", names(Healthy) )
+
+FinalDatasetAll <- FinalDatasetMissing %>% 
+  full_join(., Healthy) 
+
+fwrite(FinalDatasetAll, file = paste0(IncludeFigHere, "/FinalDatasetAll.csv"))
+
+
+library(readr)
+library(lubridate)
+# install.packages(c('stddiff', 'MatchIt'))
+
+##################
+source('/rds/projects/g/gkoutosg-variant-prediction/Colorectal/matchmatch/match.R')
+
+#DATA_FILE <- 'data/LauraFinalData.csv'
+
+#OUTPUT_MATCHED_DF <- 'data/LauraFinalData_matched_df.csv'
+OUTPUT_PERFORMANCE <- 'MM_MatchedPerformance9Apr.xlsx'
+
+### prepare dataset ###
+
+df <- FinalDatasetAll
+
+### matching ###
+matching_numerical <- c('age_blood') #c('age_recruitment')
+matching_categorical <- c('sex')#c('sex_male')
+matching_variables <- c(matching_numerical, matching_categorical)
+
+# matching on
+df$casecontrol <- as.numeric(FinalDatasetAll$Progression != "Healthy")
+df <- df %>% 
+  drop_na(c(age_blood, sex))
+#df$casecontrol <- as.numeric(!(is.na(df$`NAFLDDate`) & is.na(df$`NASHDate`)))
+subgroup_variable <- 'casecontrol'
+
+#take out participants with missing values in matchingvars: 
+
+df$N_na <- as.numeric(is.na(df$apolipoprotein_b))
+df$N_na2 <- as.numeric(is.na(df$apolipoprotein_a))
+df$N_na3 <- as.numeric(is.na(df$monocyte_count))
+df$N_na4 <- as.numeric(is.na(df$lipoprotein_a))
+df$N_na5 <- as.numeric(is.na(df$direct_bilirubin))
+df$N_na6 <- as.numeric(is.na(df$testosterone))
+df$N_na7 <- as.numeric(is.na(df$glycated_haemoglobin_hba1c))
+df$N_na8 <- as.numeric(is.na(df$reticulocyte_percentage))
+
+dfco <- df[(df$casecontrol == 0) & (df$N_na == 0) & (df$N_na2 == 0) & (df$N_na3 == 0) & (df$N_na4 == 0) & (df$N_na5 == 0) & (df$N_na6 == 0) & (df$N_na7 == 0) & (df$N_na8 == 0),] #already done?& is.na(df$first_icd)
+dfca <- df[df$casecontrol == 1,]
+
+df_to_merge <- rbind(dfco, dfca)
+##instead of df_to_merge[, c("f.eid", subgroup_variable, matching_variables)] this:
+DataToMatch <- df_to_merge %>%
+  select("eid", subgroup_variable, matching_variables)
+
+# do it
+matched_data <- match_model(DataToMatch, subgroup_variable, matching_variables, distance='mahalanobis', method='nearest') #added a ratio of 3 to get more contros #28Sep
+std_diff_to_file(matched_data, subgroup_variable, matching_categorical, matching_numerical, OUTPUT_PERFORMANCE)
+
+
+return_data <- df[df$eid %in% matched_data$eid,]
+#write.csv(return_data,"DataMatched18AprSep.csv", row.names = FALSE)
+fwrite(return_data, file = paste0(IncludeFigHere, "/FinalDatasetAllMATCHED.csv"))
+
+########################
+
+table(return_data$casecontrol) 
+
+########################
+
+
+pdf(paste0( IncludeFigHere, "/PlotMissingAfterMATCH.pdf"), 13,15)
+
+print(vis_miss(return_data,  sort_miss = TRUE))
+
+dev.off()
+
+pdf(paste0( IncludeFigHere, "/PlotMissingAfterClusterMATCH.pdf"), 13,15)
+
+print(vis_miss(return_data,  cluster = TRUE, sort_miss = TRUE) + theme(axis.text.x =  element_text(angle = 90)))
+
+dev.off()
+
+
+#################################
+
+#Need imputation (for the disease patients - can do it before or after? should be done after in theory bbut can try modeling both)
+
+
+
+#Imputation
+
+return_data$Progression <- as.character(return_data$Progression)
+
+rec <- recipe(Progression ~ .,
+             data = return_data)
+
+Predictors <- return_data %>%
+ select( basophill_percentage:urea)
+
+DataImputed <-  rec %>%
+ step_string2factor(all_nominal_predictors()) %>%
+ step_impute_knn(names(Predictors), neighbors = 3)
+
+ratio_recipe2 <- prep(DataImputed, training = return_data)
+
+imputed <- bake(ratio_recipe2, return_data)
+
+table(is.na(imputed))
+
+fwrite(imputed, file = paste0(IncludeFigHere, "/imputed.csv"))
+
+
+##################################### Match controls
+
+pdf(paste0( IncludeFigHere, "/FinalPlotMATCHImputed.pdf"), onefile = TRUE, width = 25, height = 10)
+
+Numeric <-  imputed %>%
+  dplyr::select(Progression, "basophill_percentage": "urea") %>%
+  pivot_longer(-Progression, names_to = "Features", values_to = "Value") 
+
+Plot1 <- Numeric %>%
+  ggplot(aes(  Progression, Value,fill = Progression)) +
+  facet_wrap( Features ~. , scales = "free") +
+  #geom_violindot(scale = "area")+
+  geom_boxplot(outlier.shape = NA) +
+  #geom_miss_point(alpha = 0.5) 
+  geom_point(alpha = 0.5) +
+  labs( x = "Progression", y= "Value") + 
+  theme_bw()
+#scale_colour_manual(values = cols, aesthetics = c("fill"))+ 
+# guides(colour=FALSE)
+
+print(Plot1)
+
+
+dev.off()
+
