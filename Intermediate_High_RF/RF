@@ -1,0 +1,110 @@
+
+/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/
+####################################################################################
+#                              Random Forest           
+####################################################################################
+
+
+imputed$type <- ifelse(imputed$Type_cancer == "Healthy", "Control", "Case")
+healthy <- subset(imputed, Progression == "Healthy") #523 samples
+high_risk <- subset(imputed, Progression == "high risk") #141 samples
+intermediate_risk <- subset(imputed, Progression == "intermediate risk") #327 samples
+low_risk <- subset(imputed, Progression == "low risk") #55 samples
+rf_intermediate_high <- rbind(intermediate_risk, high_risk)
+
+##### Sampling matched healthy samples to match number of samples for cases
+library(caret)
+library(ROSE)
+num_samples_diff <- nrow(intermediate_risk) - nrow(high_risk)
+train_upsampled <- ovun.sample(Progression ~ ., data = rf_intermediate_high, method = "over", N = nrow(intermediate_risk) * 2, seed = 123)
+upsampled <- train_upsampled$data
+upsampled$type[upsampled$Progression == "intermediate risk"] <- "Control"
+upsampled$type[upsampled$Progression == "high risk"] <- "Case"
+total <- upsampled
+total <- total[c(7:60, 71)]
+data_split <- initial_split(total, prop = 0.7)
+
+###################following tutorial https://rviews.rstudio.com/2019/06/19/a-gentle-intro-to-tidymodels/##############################
+
+data_recipe <- training(data_split) %>%
+  recipe(type ~.) %>%
+  step_corr(all_predictors()) %>%
+  step_center(all_predictors(), -all_outcomes()) %>%
+  step_scale(all_predictors(), -all_outcomes()) %>%
+  prep()
+
+data_testing <- data_recipe %>%
+  bake(testing(data_split)) 
+
+data_training <- juice(data_recipe)
+
+data_ranger <- rand_forest(trees = 100, mode = "classification") %>%
+  set_engine("ranger", importance = "impurity") %>%
+  fit(type ~ ., data = data_training)
+
+predict(data_ranger, data_testing)
+
+data_bound <- data_ranger %>%
+  predict(data_testing) %>%
+  bind_cols(data_testing) %>%
+  glimpse()
+
+data_metrics <- data_ranger %>%
+  predict(data_testing) %>%
+  bind_cols(data_testing) %>%
+  metrics(truth = type, estimate = .pred_class)
+
+data_prob <- data_ranger %>%
+  predict(data_testing, type = "prob") %>%
+  glimpse()
+
+data_probs <- data_ranger %>%
+  predict(data_testing, type = "prob") %>%
+  bind_cols(data_testing)
+
+data_plot <- data_probs %>%
+  gain_curve(type, .pred_Case) %>%
+  glimpse()
+
+data_probs %>% 
+  gain_curve(type, .pred_Case,) %>%
+  autoplot()
+data_probs %>% 
+  gain_curve(type, .pred_Control,) %>%
+  autoplot()
+data_probs%>%
+  roc_curve(type, .pred_Case) %>%
+  autoplot()
+data_probs%>%
+  roc_curve(type, .pred_Control) %>%
+  autoplot()
+
+importance_scores <- data_ranger %>%
+  vip(num_features = 15)
+customized_vip <- importance_scores +
+  ggtitle("High Risk vs Intermediate Risk") + ##### REMEMBER TO CHANGE THIS AS AND WHEN
+  scale_fill_manual(values = "blue") 
+print(customized_vip)
+
+
+####################################################################################
+#                             Confusion Matrix          
+####################################################################################
+
+data_preds <- predict(data_ranger, data_testing)
+truth_labels <- pull(data_testing, type)
+pred_labels <- pull(data_preds, .pred_class)
+conf_matrix <- confusionMatrix(data = as.factor(pred_labels), reference = as.factor(truth_labels))
+print(conf_matrix)
+write.table(conf_matrix$overall, file = "confusion_matrix_statistics_intermediatehigh.txt", sep = "\t", quote = FALSE)
+library(viridis)
+conf_table <- conf_matrix$table
+conf_df <- as.data.frame(conf_table)
+colnames(conf_df) <- c("Predicted", "Actual", "Count")
+heatmap_plot <- ggplot(conf_df, aes(x = Predicted, y = Actual, fill = Count)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Count)) +
+  scale_fill_viridis() + # You can change the color scale if you prefer
+  theme_minimal() +
+  labs(x = "Predicted", y = "Actual", title = "Confusion Matrix Heatmap")
+print(heatmap_plot)
