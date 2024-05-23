@@ -1,0 +1,303 @@
+
+/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/
+###### Randon Forest High Risk Low Risk 
+
+imputed$type <- ifelse(imputed$Type_cancer == "Healthy", "Control", "Case")
+high_risk <- subset(imputed, Progression == "high risk") #141 sampless
+low_risk <- subset(imputed, Progression == "low risk") #55 samples
+rf_high_low <- rbind(high_risk, low_risk)
+##### Sampling matched healthy samples to match number of samples for cases
+library(caret)
+library(ROSE)
+num_samples_diff <- nrow(high_risk) - nrow(low_risk)
+train_upsampled <- ovun.sample(Type_cancer ~ ., data = rf_high_low, method = "over", N = nrow(high_risk) * 2, seed = 123)
+upsampled <- train_upsampled$data
+total <- upsampled
+total$type[total$FinalLabel == "Monoclonal gammopathy (MGUS)"] <- "Control"
+total <- total[c(7:60, 71)]
+data_split <- initial_split(total, prop = 0.7)
+
+###################following tutorial https://rviews.rstudio.com/2019/06/19/a-gentle-intro-to-tidymodels/##############################
+
+data_recipe <- training(data_split) %>%
+  recipe(type ~.) %>%
+  step_corr(all_predictors()) %>%
+  step_center(all_predictors(), -all_outcomes()) %>%
+  step_scale(all_predictors(), -all_outcomes()) %>%
+  prep()
+
+data_testing <- data_recipe %>%
+  bake(testing(data_split)) 
+
+data_training <- juice(data_recipe)
+
+data_ranger <- rand_forest(trees = 100, mode = "classification") %>%
+  set_engine("ranger", importance = "impurity") %>%
+  fit(type ~ ., data = data_training)
+
+predict(data_ranger, data_testing)
+
+data_bound <- data_ranger %>%
+  predict(data_testing) %>%
+  bind_cols(data_testing) %>%
+  glimpse()
+
+data_metrics <- data_ranger %>%
+  predict(data_testing) %>%
+  bind_cols(data_testing) %>%
+  metrics(truth = type, estimate = .pred_class)
+
+data_prob <- data_ranger %>%
+  predict(data_testing, type = "prob") %>%
+  glimpse()
+
+data_probs <- data_ranger %>%
+  predict(data_testing, type = "prob") %>%
+  bind_cols(data_testing)
+
+data_plot <- data_probs %>%
+  gain_curve(type, .pred_Case) %>%
+  glimpse()
+
+data_probs %>% 
+  gain_curve(type, .pred_Case,) %>%
+  autoplot()
+data_probs %>% 
+  gain_curve(type, .pred_Control,) %>%
+  autoplot()
+data_probs%>%
+  roc_curve(type, .pred_Case) %>%
+  autoplot()
+data_probs%>%
+  roc_curve(type, .pred_Control) %>%
+  autoplot()
+
+importance_scores <- data_ranger %>%
+  vip(num_features = 15)
+customized_vip <- importance_scores +
+  ggtitle("High Risk vs Low Risk") + 
+  scale_fill_manual(values = "blue") 
+print(customized_vip)
+
+
+####################################################################################
+#                             Confusion Matrix          
+####################################################################################
+
+data_preds <- predict(data_ranger, data_testing)
+truth_labels <- pull(data_testing, type)
+pred_labels <- pull(data_preds, .pred_class)
+conf_matrix <- confusionMatrix(data = as.factor(pred_labels), reference = as.factor(truth_labels))
+print(conf_matrix)
+write.table(conf_matrix$overall, file = "confusion_matrix_statistics_highlow.txt", sep = "\t", quote = FALSE)
+library(viridis)
+conf_table <- conf_matrix$table
+conf_df <- as.data.frame(conf_table)
+colnames(conf_df) <- c("Predicted", "Actual", "Count")
+heatmap_plot <- ggplot(conf_df, aes(x = Predicted, y = Actual, fill = Count)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Count)) +
+  scale_fill_viridis() + # You can change the color scale if you prefer
+  theme_minimal() +
+  labs(x = "Predicted", y = "Actual", title = "Confusion Matrix Heatmap")
+print(heatmap_plot)
+
+
+
+
+importance_scores[["data"]][["Variable"]]
+
+#[1] "albumin"                     "platelet_distribution_width" "igf1"                       
+#[4] "lymphocyte_percentage"       "immature_reticulocyte"       "testosterone"               
+#[7] "cystatin_c"                  "calcium"                     "shbg"                       
+#[10] "apolipoprotein_a"            "lipoprotein_a"               "platelet_count"             
+#[13] "alanine_aminotransferase"    "glycated_haemoglobin_hba1c"  "lymphocyte_count"   
+
+combined <- rbind(high_risk, low_risk)
+combined$type[combined$Type_cancer == "Monoclonal gammopathy (MGUS)"] <- "MGUS"
+combined$type[combined$Type_cancer == "Multiple Myeloma"] <- "MM"
+
+#Plot of the top 15
+anova_result <- aov(albumin~ type, data = combined)
+summary(anova_result)
+
+plot1<- ggplot(combined, aes(x = type, y = albumin, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "ALbumin",
+       title = "Boxplot of Albumin by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              test = stats::t.test, textsize = 6, vjust = -0.5)
+####################################################################################
+anova_result <- aov(platelet_distribution_width ~ type, data = combined)
+summary(anova_result)
+
+plot2 <- ggplot(combined, aes(x = type, y = platelet_distribuion_width, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Platelet Distribution Width",
+       title = "Boxplot of Platelet Distribution Width by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+
+####################################################################################
+anova_result <- aov(igf1 ~ type, data = combined)
+summary(anova_result)
+
+plot3 <- ggplot(combined, aes(x = type, y = ifg1, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "IGF1",
+       title = "Boxplot of IGF1 by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+####################################################################################
+anova_result <- aov(lymphocyte_percentage ~ type, data = combined)
+summary(anova_result)
+
+plot4 <- ggplot(combined, aes(x = type, y = lymphocyte_percentage, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Lymphocyte Percentage",
+       title = "Boxplot of Lymphocyte Percentage by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+####################################################################################
+anova_result <- aov(immature_reticulocyte ~ type, data = combined)
+summary(anova_result)
+
+plot5 <- ggplot(combined, aes(x = type, y = immature_reticylocyte, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Immature Reticulocyte",
+       title = "Boxplot of Immature Reticulocyte by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+####################################################################################
+anova_result <- aov(testosterone ~ type, data = combined)
+summary(anova_result)
+
+plot6 <- ggplot(combined, aes(x = type, y = testosterone, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Testosterone",
+       title = "Boxplot of Testosterone by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+####################################################################################
+
+anova_result <- aov(cystatin_c ~ type, data = combined)
+summary(anova_result)
+
+plot7 <- ggplot(combined, aes(x = type, y = cystatin_c, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Cystatin C",
+       title = "Boxplot of Cystatin C by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+
+####################################################################################
+anova_result <- aov(calcium ~ type, data = combined)
+summary(anova_result)
+
+plot8 <- ggplot(combined, aes(x = type, y = calcium, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Calcium",
+       title = "Boxplot of Calcium by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+####################################################################################
+anova_result <- aov(shbg ~ type, data = combined)
+summary(anova_result)
+
+plot9 <- ggplot(combined, aes(x = type, y = shbg, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "SHBG",
+       title = "Boxplot of SHBG by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+
+####################################################################################
+anova_result <- aov(apolipoprotein_a ~ type, data = combined)
+summary(anova_result)
+
+plot10 <- ggplot(combined, aes(x = type, y = apolipoprotein_a, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Apolipoprotein A",
+       title = "Boxplot of Apolipoprotein A by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+
+####################################################################################
+anova_result <- aov(lipoprotein_a ~ type, data = combined)
+summary(anova_result)
+
+plot11 <- ggplot(combined, aes(x = type, y = lipoprotein_a, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Lipoprotein A",
+       title = "Boxplot of Lipoprotein A by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+####################################################################################
+anova_result <- aov(platelet_count ~ type, data = combined)
+summary(anova_result)
+
+plot12 <- ggplot(combined, aes(x = type, y = platelet_count, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Platelet Count",
+       title = "Boxplot of Platelet Count by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+
+####################################################################################
+anova_result <- aov(alanine_aminotransferase ~ type, data = combined)
+summary(anova_result)
+
+plot13 <- ggplot(combined, aes(x = type, y = alanine_aminotransferase, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Alanine Aminotransferase",
+       title = "Boxplot of Alanine Aminotransferase by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+
+####################################################################################
+anova_result <- aov(glycated_haemoglobin_hba1c ~ type, data = combined)
+summary(anova_result)
+
+plot14 <- ggplot(combined, aes(x = type, y = glycated_haemoglobin_hba1c, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Glycated Haemoglobin HBA1C",
+       title = "Boxplot of Glycated Haemoglobin. HBA1C by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+
+####################################################################################
+anova_result <- aov(lymphocyte_count ~ type, data = combined)
+summary(anova_result)
+
+plot15 <- ggplot(combined, aes(x = type, y = lymphocyte_count, fill = type)) + 
+  geom_boxplot() +
+  labs(x = "Type", y = "Lymphocyte Count",
+       title = "Boxplot of Lymphocyte Count by Type") +
+  geom_signif(comparisons = list(c("MGUS", "MM")), 
+              textsize = 6, vjust = -0.5)
+
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot1.png", plot = plot1)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot2.png", plot = plot2, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot3.png", plot = plot3, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot4.png", plot = plot4, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot5.png", plot = plot5, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot6.png", plot = plot6, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot7.png", plot = plot7, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot8.png", plot = plot8, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot9.png", plot = plot9, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot10.png", plot = plot10, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot11.png", plot = plot11, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot12.png", plot = plot12, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot13.png", plot = plot13, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot14.png", plot = plot14, width = 8, height = 6, dpi = 300)
+ggsave("/rds/projects/g/gkoutosg-variant-prediction/AML/gwas/Megan_Work/Box_Plots_VIP/High_Risk_Low/plot15.png", plot = plot15, width = 8, height = 6, dpi = 300)
+
+
+
+
+
+
+
+
+
+
